@@ -25,29 +25,40 @@ Startup-Attendance/
 │   │   │       ├── Badge.tsx        # Etiqueta de estado (Puntual, Atraso, etc.)
 │   │   │       └── StatCard.tsx     # Tarjeta de estadística con ícono y valor
 │   │   └── lib/
-│   │       ├── mockData.ts          # Datos de prueba: trabajadores, asistencia, alertas
-│   │       ├── types.ts             # Definición de tipos TypeScript del proyecto
+│   │       ├── api.ts               # Cliente HTTP tipado: auth header + snake_case→camelCase
+│   │       ├── hooks.ts             # Hooks React Query para datos y mutaciones
+│   │       ├── supabase.ts          # Cliente Supabase para autenticación
+│   │       ├── AuthContext.tsx      # Contexto global de sesión: login, logout, estado
+│   │       ├── mockData.ts          # Datos de prueba (referencia, ya no se usa)
+│   │       ├── types.ts             # Tipos TypeScript del proyecto
 │   │       └── utils.ts             # Funciones auxiliares: fechas, RUT, horas, colores
+│   ├── pages/
+│   │   └── Login.tsx                # Página de inicio de sesión con Supabase Auth
 │   ├── public/
 │   │   ├── favicon.svg              # Ícono de la pestaña del navegador
 │   │   └── icons.svg                # Sprite de íconos SVG
 │   ├── package.json                 # Dependencias del frontend
+│   ├── .env.local                   # Variables de entorno frontend (Supabase URL y anon key)
 │   ├── tailwind.config.js           # Colores y tokens del sistema de diseño
 │   ├── vite.config.ts               # Configuración del servidor de desarrollo
 │   └── tsconfig.json                # Configuración de TypeScript
 │
 ├── backend/                         # API REST (Python + FastAPI)
 │   ├── main.py                      # Punto de entrada del servidor, CORS, rutas
-│   ├── config.py                    # Variables de entorno (Supabase URL y key)
+│   ├── config.py                    # Variables de entorno (Supabase URL, keys, JWT secret)
 │   ├── database.py                  # Conexión con Supabase
 │   ├── .env                         # Credenciales privadas (no se sube a git)
 │   ├── models/
 │   │   ├── schemas.py               # Modelos de datos para la API (Pydantic)
 │   │   └── __init__.py
+│   ├── dependencies/
+│   │   ├── auth.py                  # Middleware JWT: valida token Supabase en cada request
+│   │   └── __init__.py
 │   ├── routers/
-│   │   ├── workers.py               # Endpoints de trabajadores (CRUD)
-│   │   ├── attendance.py            # Endpoints de asistencia y marcajes
+│   │   ├── workers.py               # Endpoints de trabajadores (CRUD completo)
+│   │   ├── attendance.py            # Endpoints de asistencia, mark manual y simulate-day
 │   │   ├── schedules.py             # Endpoints de horarios
+│   │   ├── auth.py                  # Endpoint /me para verificar sesión
 │   │   └── __init__.py
 │   └── supabase_schema.sql          # Estructura de las tablas en la base de datos
 │
@@ -85,7 +96,10 @@ Startup-Attendance/
 
 | Archivo | Qué hace |
 |---------|----------|
-| `lib/mockData.ts` | Contiene los datos de prueba del mes de mayo 2026: 8 trabajadores, registros de asistencia, alertas. Reemplazará a la API cuando esté conectada |
+| `lib/api.ts` | Cliente HTTP tipado que conecta con el backend. Convierte respuestas de snake_case a camelCase automáticamente |
+| `lib/hooks.ts` | Hooks de React Query para cargar datos de la API: trabajadores, horarios, asistencia, estadísticas |
+| `lib/mockData.ts` | Datos de prueba (mayo 2026). Ya no se usa en producción, se conserva como referencia |
+| `pages/Soporte.tsx` | Página de soporte con botón WhatsApp, correo, y preguntas frecuentes |
 | `lib/types.ts` | Define las estructuras de datos TypeScript: Worker, Schedule, AttendanceRecord, etc. |
 | `lib/utils.ts` | Funciones de uso general: formatear fechas en español, calcular horas, colorear puntualidad, formatear RUT chileno |
 
@@ -108,25 +122,48 @@ Startup-Attendance/
 
 ### ✅ Completado
 
-- Sistema de diseño completo: dark mode, colores, tipografía Inter, tokens Tailwind
-- 6 páginas funcionales con datos de prueba (mayo 2026)
-- Sidebar con navegación activa y badge de alertas
-- Dashboard "Ahora mismo" con reloj en vivo, stats y lista de dentro/sin registrar
-- Vista Día con navegación entre días hábiles y tabla completa de asistencia
-- Reporte Mensual con gráfico de barras (Recharts) y tabla por trabajador
-- Página Trabajadores con búsqueda, tabla, sección colapsable de inactivos, **modal "Agregar trabajador"** con formateo de RUT chileno
-- Página Horarios: lista de turnos + detalle con días activos y trabajadores asignados
-- Página Exportar: tarjetas de descarga + sección de exportación personalizada con selector de trabajadores
-- Backend FastAPI con estructura de routers y conexión a Supabase lista
-- Schema SQL de Supabase definido
+- Sistema de diseño completo: modo claro, colores, tipografía Inter, tokens Tailwind
+- 7 páginas funcionales conectadas al backend real (Soporte incluida)
+- Sidebar con navegación activa, badge de alertas dinámico y cerrar sesión
+- Dashboard "Ahora mismo" conectado a API
+- Vista Día: registro manual de entrada/salida + botón "Simular día" (dev)
+- Reporte Mensual: navega por mes, gráfico y tabla desde la API
+- Trabajadores: agregar, editar, desactivar, reactivar — todo conectado a API
+- Horarios: turnos y trabajadores desde la API
+- Exportar: plantilla base en Google Drive + nota de integración n8n
+- Soporte: WhatsApp (+56991717490), correo, FAQ accordion
+- Backend FastAPI: routers workers, attendance, schedules, auth
+- `/api/v1/attendance/mark`: registro manual con hora y fecha customizables
+- `/api/v1/attendance/simulate-day`: simula jornada completa con tiempos realistas
+- Autenticación con Supabase Auth + JWT (modo dev: sin restricción si JWT secret no configurado)
+- Backend: middleware JWT en todos los routers vía `dependencies/auth.py`
+- Frontend: AuthContext + Login page + rutas protegidas + logout en sidebar
 
-### 🔄 Pendiente / En progreso
+### 🔒 Auth — Cómo activar en producción
 
-- Conectar frontend con la API del backend (actualmente usa `mockData.ts`)
-- Implementar autenticación de usuario (login)
-- Guardar trabajador nuevo desde el modal (POST a la API)
-- Integración con lector biométrico ZKTeco ZK4500 (futuro)
-- Alertas automáticas por WhatsApp/email via n8n (futuro)
+Requiere 3 pasos:
+
+1. **Crear usuario admin** en Supabase Dashboard → Authentication → Users → "Invite user" (pon tu correo y contraseña)
+
+2. **Backend** — agregar al `.env`:
+   ```
+   SUPABASE_JWT_SECRET=[JWT Secret de Supabase Dashboard → Settings → API → JWT Settings]
+   ```
+
+3. **Frontend** — completar `frontend/.env.local`:
+   ```
+   VITE_SUPABASE_URL=[mismo que SUPABASE_URL del backend .env]
+   VITE_SUPABASE_ANON_KEY=[mismo que SUPABASE_KEY del backend .env]
+   ```
+
+Mientras esas variables no estén configuradas, la app funciona en **modo dev sin login** (ambos extremos bypass).
+
+### 🔄 Pendiente / Siguiente
+
+- Exportación real de Excel/PDF (actualmente los botones no descargan nada)
+- Integración con lector biométrico ZKTeco ZK4500
+- Automatización mensual con n8n (poblar Google Sheet + PDF + email)
+- Feriados legales chilenos en el cálculo de días hábiles
 - Pruebas con datos reales de un negocio piloto
 
 ---
@@ -135,11 +172,13 @@ Startup-Attendance/
 
 | Fecha | Cambio |
 |-------|--------|
-| 2026-05-18 | Modal "Agregar trabajador" en página Trabajadores con RUT chileno, nombre, cargo, teléfono, horario |
-| 2026-05-18 | Fix bug crítico: loop infinito al navegar días en VistaDia — reemplazado por índice en array |
-| 2026-05-18 | Botones de navegación deshabilitados en bordes del calendario (primer y último día hábil) |
-| 2026-05-18 | Botón "Agregar trabajador" en AhoraMismo navega a `/trabajadores` |
-| 2026-05-18 | Select de trabajador en Exportar poblado con trabajadores activos del sistema |
-| 2026-05-18 | ReporteMensual: flecha adelante deshabilitada cuando no hay datos para el mes siguiente |
-| 2026-05-18 | WorkerRow movido fuera del componente Trabajadores (anti-patrón React corregido) |
-| 2026-05-18 | Proyecto inicializado: stack React + Tailwind v3 + FastAPI + Supabase |
+| 2026-05-21 | Auth completa: Supabase JWT backend + Login page + rutas protegidas frontend |
+| 2026-05-21 | VistaDia: registro manual entrada/salida + botón "Simular día" |
+| 2026-05-21 | Trabajadores: modal editar + desactivar + reactivar conectados a API |
+| 2026-05-21 | Exportar: plantilla Google Drive creada + sección n8n documentada |
+| 2026-05-21 | `/api/v1/attendance/mark` acepta body con tipo, fecha y hora custom |
+| 2026-05-21 | `/api/v1/attendance/simulate-day` genera jornada realista para todos los ausentes |
+| 2026-05-21 | Modo claro, validaciones de formulario, autofill de prueba, página de Soporte |
+| 2026-05-20 | Integración frontend ↔ backend completa: todas las páginas usan API real |
+| 2026-05-20 | Creado `src/lib/api.ts` y `src/lib/hooks.ts` |
+| 2026-05-18 | MVP inicial: 6 páginas con mockData, backend FastAPI, schema Supabase |

@@ -1,11 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends
 from supabase import Client
 from database import get_supabase
-from models.schemas import AttendanceRecord, AttendanceRecordCreate, AttendanceRecordUpdate, DailyStats, MonthlyWorkerStats
-from datetime import date
+from models.schemas import AttendanceRecord, AttendanceRecordCreate, AttendanceRecordUpdate, AttendanceMarkRequest, DailyStats, MonthlyWorkerStats
+from dependencies.auth import get_current_user
+from datetime import date, datetime
+from typing import Optional
 import calendar
+import random
 
-router = APIRouter(prefix="/attendance", tags=["attendance"])
+router = APIRouter(prefix="/attendance", tags=["attendance"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/today", response_model=list[AttendanceRecord])
@@ -53,8 +56,10 @@ async def get_day_stats(date_str: str, db: Client = Depends(get_supabase)):
 
 @router.get("/month/{year}/{month}", response_model=list[MonthlyWorkerStats])
 async def get_month_stats(year: int, month: int, db: Client = Depends(get_supabase)):
-    month_str = f"{year}-{month:02d}"
-    records = db.table("attendance").select("*").like("date", f"{month_str}%").execute().data
+    _, last_day = calendar.monthrange(year, month)
+    month_start = f"{year}-{month:02d}-01"
+    month_end = f"{year}-{month:02d}-{last_day:02d}"
+    records = db.table("attendance").select("*").gte("date", month_start).lte("date", month_end).execute().data
     workers = db.table("workers").select("*, schedules(start_time, end_time)").eq("status", "active").execute().data
 
     _, days_in_month = calendar.monthrange(year, month)
@@ -109,37 +114,80 @@ async def update_record(record_id: str, updates: AttendanceRecordUpdate, db: Cli
     return result.data[0]
 
 
-# Called by ZKTeco integration layer
+# Called by ZKTeco integration layer and manual registration
 @router.post("/mark", response_model=AttendanceRecord, status_code=201)
-async def mark_attendance(worker_id: str, db: Client = Depends(get_supabase)):
-    from datetime import datetime
+async def mark_attendance(body: AttendanceMarkRequest, db: Client = Depends(get_supabase)):
     now = datetime.now()
-    today = now.date().isoformat()
-    time_str = now.strftime("%H:%M")
+    target_date = body.date or now.date().isoformat()
+    time_str = body.time or now.strftime("%H:%M")
 
-    existing = db.table("attendance").select("*").eq("worker_id", worker_id).eq("date", today).execute().data
+    existing = db.table("attendance").select("*").eq("worker_id", body.worker_id).eq("date", target_date).execute().data
+
     if existing:
         record = existing[0]
-        if not record.get("exit_time"):
+        if body.type == "entry":
+            result = db.table("attendance").update({"entry_time": time_str}).eq("id", record["id"]).execute()
+            return result.data[0]
+        if body.type == "exit" or (body.type == "auto" and not record.get("exit_time")):
             result = db.table("attendance").update({"exit_time": time_str}).eq("id", record["id"]).execute()
             return result.data[0]
         return record
 
-    worker = db.table("workers").select("*, schedules(start_time)").eq("id", worker_id).single().execute().data
+    if body.type == "exit":
+        raise HTTPException(status_code=400, detail="No hay registro de entrada para este trabajador en esta fecha")
+
+    worker = db.table("workers").select("*, schedules(start_time)").eq("id", body.worker_id).single().execute().data
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
 
     schedule_start = (worker.get("schedules") or {}).get("start_time", "09:00")
     sh, sm = map(int, schedule_start.split(":"))
-    nh, nm = now.hour, now.minute
-    late_minutes = max(0, (nh * 60 + nm) - (sh * 60 + sm))
+    th, tm = map(int, time_str.split(":"))
+    late_minutes = max(0, (th * 60 + tm) - (sh * 60 + sm))
     status = "late" if late_minutes > 0 else "punctual"
 
     result = db.table("attendance").insert({
-        "worker_id": worker_id,
-        "date": today,
+        "worker_id": body.worker_id,
+        "date": target_date,
         "entry_time": time_str,
         "status": status,
         "late_minutes": late_minutes,
     }).execute()
     return result.data[0]
+
+
+@router.post("/simulate-day", status_code=201)
+async def simulate_day(date_str: Optional[str] = None, db: Client = Depends(get_supabase)):
+    target_date = date_str or date.today().isoformat()
+    workers = db.table("workers").select("*, schedules(start_time, end_time)").eq("status", "active").execute().data
+    existing_ids = {r["worker_id"] for r in db.table("attendance").select("worker_id").eq("date", target_date).execute().data}
+
+    created = []
+    for w in workers:
+        if w["id"] in existing_ids:
+            continue
+        schedule = w.get("schedules") or {}
+        sh, sm = map(int, schedule.get("start_time", "09:00").split(":"))
+        eh, em = map(int, schedule.get("end_time", "18:00").split(":"))
+
+        entry_offset = random.choices([-5, -3, 0, 5, 10, 15, 20], weights=[5, 10, 30, 20, 15, 10, 10])[0]
+        entry_total = sh * 60 + sm + entry_offset
+        entry_h, entry_m = divmod(max(0, entry_total), 60)
+        entry_str = f"{entry_h:02d}:{entry_m:02d}"
+        late_minutes = max(0, entry_offset)
+
+        exit_total = eh * 60 + em + random.randint(-5, 15)
+        exit_h, exit_m = divmod(max(0, exit_total), 60)
+        exit_str = f"{exit_h:02d}:{exit_m:02d}"
+
+        result = db.table("attendance").insert({
+            "worker_id": w["id"],
+            "date": target_date,
+            "entry_time": entry_str,
+            "exit_time": exit_str,
+            "status": "late" if late_minutes > 0 else "punctual",
+            "late_minutes": late_minutes,
+        }).execute()
+        created.extend(result.data)
+
+    return created

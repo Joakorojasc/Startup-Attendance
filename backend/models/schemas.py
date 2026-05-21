@@ -98,6 +98,13 @@ class AttendanceRecordUpdate(BaseModel):
     late_minutes: Optional[int] = None
 
 
+class AttendanceMarkRequest(BaseModel):
+    worker_id: str
+    type: str = "auto"   # "entry", "exit", "auto"
+    date: Optional[str] = None   # YYYY-MM-DD, defaults to today
+    time: Optional[str] = None   # HH:MM, defaults to now
+
+
 class AttendanceRecord(AttendanceRecordBase):
     id: str
 

@@ -3,10 +3,8 @@ import { ChevronLeft, ChevronRight, FileText, Table2, Clock, CheckCircle2, Calen
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Avatar } from '@/components/ui/Avatar'
 import { StatCard } from '@/components/ui/StatCard'
-import { getMonthlyStats, getWorkerById } from '@/lib/mockData'
+import { useMonthlyStats, useWorkers } from '@/lib/hooks'
 import { formatMonthSpanish, addMonths, punctualityTextColor, cn } from '@/lib/utils'
-
-const MONTHS_WITH_DATA = ['2026-04', '2026-05']
 
 function PunctualityBar({ pct }: { pct: number }) {
   const color = pct >= 90 ? '#22c55e' : pct >= 70 ? '#f59e0b' : pct >= 60 ? '#f97316' : '#ef4444'
@@ -23,24 +21,29 @@ function PunctualityBar({ pct }: { pct: number }) {
 }
 
 const TOOLTIP_STYLE = {
-  backgroundColor: '#18181b',
-  border: '1px solid #27272a',
+  backgroundColor: '#ffffff',
+  border: '1px solid #cbd5e1',
   borderRadius: '8px',
-  color: '#f4f4f5',
+  color: '#0f172a',
   fontSize: '12px',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
 }
 
 export function ReporteMensual() {
-  const [date, setDate] = useState(new Date('2026-05-01'))
+  const [date, setDate] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
   const year = date.getFullYear()
   const month = date.getMonth()
-  const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
-  const hasData = MONTHS_WITH_DATA.includes(monthKey)
 
-  const nextMonthKey = `${date.getFullYear()}-${String(date.getMonth() + 2).padStart(2, '0')}`
-  const canGoNext = MONTHS_WITH_DATA.includes(nextMonthKey)
+  const { data: stats = [], isLoading: loadingStats } = useMonthlyStats(year, month)
+  const { data: workers = [], isLoading: loadingWorkers } = useWorkers('active')
 
-  const stats = hasData ? getMonthlyStats(year, month) : []
+  const now = new Date()
+  const canGoNext = year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth())
+
+  const workerMap = Object.fromEntries(workers.map((w) => [w.id, w]))
 
   const totalHours = stats.reduce((s, r) => s + r.totalHours, 0)
   const avgPunctuality = stats.length > 0
@@ -49,18 +52,18 @@ export function ReporteMensual() {
   const totalLate = stats.reduce((s, r) => s + r.lateCount, 0)
   const workingDays = stats[0]?.totalWorkingDays ?? 0
 
-  const chartData = stats.map((s) => {
-    const worker = getWorkerById(s.workerId)
-    return {
-      name: worker?.name.split(' ')[0] ?? '',
-      horas: s.totalHours,
-      color: worker?.avatarColor ?? '#6366f1',
-    }
-  })
+  const chartData = stats.map((s) => ({
+    name: s.workerName.split(' ')[0],
+    horas: s.totalHours,
+    color: workerMap[s.workerId]?.avatarColor ?? '#6366f1',
+  }))
+
+  if (loadingStats || loadingWorkers) {
+    return <div className="p-6 text-sm text-text-muted">Cargando...</div>
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-[1100px]">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Reporte Mensual</h1>
@@ -78,7 +81,6 @@ export function ReporteMensual() {
         </div>
       </div>
 
-      {/* Month nav */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => setDate(addMonths(date, -1))}
@@ -98,13 +100,12 @@ export function ReporteMensual() {
         </button>
       </div>
 
-      {!hasData ? (
+      {stats.length === 0 ? (
         <div className="bg-bg-surface border border-border rounded-lg p-12 text-center">
           <p className="text-text-muted text-sm">Sin datos para este mes</p>
         </div>
       ) : (
         <>
-          {/* Stats */}
           <div className="grid grid-cols-4 gap-3">
             <StatCard label="Total horas mes" value={`${totalHours}h`} icon={Clock} iconColor="text-accent" sub="total del equipo" />
             <StatCard
@@ -115,7 +116,7 @@ export function ReporteMensual() {
               valueColor={avgPunctuality >= 80 ? 'text-success' : 'text-warning'}
               sub="promedio del equipo"
             />
-            <StatCard label="Días trabajados" value={workingDays} icon={CalendarDays} iconColor="text-text-secondary" sub={`días hábiles en ${formatMonthSpanish(year, month).split(' ')[0].toLowerCase()}`} />
+            <StatCard label="Días trabajados" value={workingDays} icon={CalendarDays} iconColor="text-text-secondary" sub={`días hábiles* en ${formatMonthSpanish(year, month).split(' ')[0].toLowerCase()}`} />
             <StatCard
               label="Total atrasos"
               value={totalLate}
@@ -126,28 +127,13 @@ export function ReporteMensual() {
             />
           </div>
 
-          {/* Chart */}
           <div className="bg-bg-surface border border-border rounded-lg p-4">
             <h2 className="text-sm font-semibold text-text-primary mb-4">Horas por trabajador</h2>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={chartData} barSize={28}>
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: '#71717a', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: '#71717a', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={28}
-                />
-                <Tooltip
-                  contentStyle={TOOLTIP_STYLE}
-                  cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                  formatter={(val) => [`${val}h`, 'Horas']}
-                />
+                <XAxis dataKey="name" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.03)' }} formatter={(val) => [`${val}h`, 'Horas']} />
                 <Bar dataKey="horas" radius={[4, 4, 0, 0]}>
                   {chartData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} fillOpacity={0.8} />
@@ -157,11 +143,10 @@ export function ReporteMensual() {
             </ResponsiveContainer>
           </div>
 
-          {/* Table */}
           <div className="bg-bg-surface border border-border rounded-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <h2 className="text-sm font-semibold text-text-primary">Resumen por trabajador — {formatMonthSpanish(year, month)}</h2>
-              <span className="text-xs text-text-muted">{workingDays} días hábiles · Horario estándar: 09:00 → 18:00 (8h diarias)</span>
+              <span className="text-xs text-text-muted">{workingDays} días hábiles*</span>
             </div>
             <table className="w-full text-sm">
               <thead>
@@ -173,27 +158,20 @@ export function ReporteMensual() {
               </thead>
               <tbody className="divide-y divide-border">
                 {stats.map((s) => {
-                  const worker = getWorkerById(s.workerId)
-                  if (!worker) return null
+                  const worker = workerMap[s.workerId]
                   return (
                     <tr key={s.workerId} className="hover:bg-bg-hover transition-colors duration-100">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <Avatar name={worker.name} color={worker.avatarColor} size="sm" />
-                          <span className="font-medium text-text-primary">{worker.name}</span>
+                          <Avatar name={s.workerName} color={worker?.avatarColor ?? '#6366f1'} size="sm" />
+                          <span className="font-medium text-text-primary">{s.workerName}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-text-secondary tabular-nums">
-                        {s.daysPresent} / {s.totalWorkingDays}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-accent font-medium tabular-nums">{s.totalHours}h</span>
-                      </td>
+                      <td className="px-4 py-3 text-text-secondary tabular-nums">{s.daysPresent} / {s.totalWorkingDays}</td>
+                      <td className="px-4 py-3"><span className="text-accent font-medium tabular-nums">{s.totalHours}h</span></td>
                       <td className="px-4 py-3 text-text-muted tabular-nums">+{s.extraHours}h</td>
                       <td className="px-4 py-3 text-text-secondary tabular-nums">{s.lateCount}</td>
-                      <td className="px-4 py-3 w-40">
-                        <PunctualityBar pct={s.punctualityPct} />
-                      </td>
+                      <td className="px-4 py-3 w-40"><PunctualityBar pct={s.punctualityPct} /></td>
                     </tr>
                   )
                 })}

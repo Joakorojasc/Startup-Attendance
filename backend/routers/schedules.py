@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from supabase import Client
 from database import get_supabase
 from models.schemas import Schedule, ScheduleCreate, ScheduleUpdate
+from dependencies.auth import get_current_user
 
-router = APIRouter(prefix="/schedules", tags=["schedules"])
+router = APIRouter(prefix="/schedules", tags=["schedules"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=list[Schedule])

@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from supabase import Client
 from database import get_supabase
 from models.schemas import Worker, WorkerCreate, WorkerUpdate
+from dependencies.auth import get_current_user
 
-router = APIRouter(prefix="/workers", tags=["workers"])
+router = APIRouter(prefix="/workers", tags=["workers"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=list[Worker])

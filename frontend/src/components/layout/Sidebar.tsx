@@ -7,13 +7,16 @@ import {
   Users,
   Clock,
   Download,
+  LifeBuoy,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/Avatar'
-import { RECENT_ALERTS } from '@/lib/mockData'
+import { useAttendanceToday } from '@/lib/hooks'
+import { useAuth } from '@/lib/AuthContext'
 
 const navMain = [
-  { to: '/', label: 'Ahora mismo', icon: Radio, badge: RECENT_ALERTS.length },
+  { to: '/', label: 'Ahora mismo', icon: Radio },
   { to: '/dia', label: 'Vista del Día', icon: CalendarDays },
   { to: '/mes', label: 'Reporte Mensual', icon: BarChart3 },
 ]
@@ -64,6 +67,12 @@ function NavItem({
 }
 
 export function Sidebar() {
+  const { data: todayRecords = [] } = useAttendanceToday()
+  const alertCount = todayRecords.filter((r) => r.lateMinutes > 0 && r.entryTime).length
+  const { session, authConfigured, logout } = useAuth()
+  const userEmail = session?.user?.email ?? 'Administrador'
+  const userName = session?.user?.user_metadata?.name ?? userEmail.split('@')[0]
+
   return (
     <aside className="w-[220px] shrink-0 h-screen sticky top-0 flex flex-col border-r border-border bg-bg-surface overflow-hidden">
       {/* Logo */}
@@ -87,7 +96,7 @@ export function Sidebar() {
           </div>
           <div className="space-y-0.5">
             {navMain.map((item) => (
-              <NavItem key={item.to} {...item} />
+              <NavItem key={item.to} {...item} badge={item.to === '/' ? alertCount : undefined} />
             ))}
           </div>
         </div>
@@ -104,14 +113,43 @@ export function Sidebar() {
         </div>
       </nav>
 
+      {/* Soporte */}
+      <div className="px-2 pb-2">
+        <NavLink
+          to="/soporte"
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-2.5 px-3 py-2 rounded text-sm font-medium transition-all duration-100 group',
+              isActive ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+            )
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <LifeBuoy size={15} className={cn('shrink-0', isActive ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary')} />
+              <span>Soporte</span>
+            </>
+          )}
+        </NavLink>
+      </div>
+
       {/* User */}
       <div className="px-3 py-3 border-t border-border">
         <div className="flex items-center gap-2.5 px-1">
-          <Avatar name="Mario González" color="#6366f1" size="sm" />
+          <Avatar name={userName} color="#6366f1" size="sm" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-text-primary truncate">Mario González</div>
+            <div className="text-xs font-medium text-text-primary truncate capitalize">{userName}</div>
             <div className="text-[10px] text-text-muted">Administrador</div>
           </div>
+          {authConfigured && (
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              className="p-1 rounded hover:bg-bg-hover text-text-muted hover:text-danger transition-colors"
+            >
+              <LogOut size={13} />
+            </button>
+          )}
         </div>
       </div>
     </aside>

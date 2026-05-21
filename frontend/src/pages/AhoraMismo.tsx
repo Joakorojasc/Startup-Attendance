@@ -4,12 +4,7 @@ import { UserPlus, Clock, Users, AlertTriangle, CheckCircle2, XCircle } from 'lu
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { StatCard } from '@/components/ui/StatCard'
-import {
-  WORKERS,
-  getTodayRecords,
-  getWorkerById,
-  RECENT_ALERTS,
-} from '@/lib/mockData'
+import { useWorkers, useAttendanceToday } from '@/lib/hooks'
 import { lateLabel } from '@/lib/utils'
 
 function LiveClock() {
@@ -36,9 +31,14 @@ function LiveClock() {
 
 export function AhoraMismo() {
   const navigate = useNavigate()
-  const records = getTodayRecords()
-  const activeWorkers = WORKERS.filter((w) => w.status === 'active')
+  const { data: workers = [], isLoading: loadingWorkers } = useWorkers()
+  const { data: records = [], isLoading: loadingRecords } = useAttendanceToday()
 
+  if (loadingWorkers || loadingRecords) {
+    return <div className="p-6 text-sm text-text-muted">Cargando...</div>
+  }
+
+  const activeWorkers = workers.filter((w) => w.status === 'active')
   const inside = records.filter((r) => r.entryTime && !r.exitTime)
   const lateToday = records.filter((r) => r.lateMinutes > 0 && r.entryTime)
   const notRegistered = activeWorkers.filter((w) => !records.find((r) => r.workerId === w.id && r.entryTime))
@@ -47,9 +47,18 @@ export function AhoraMismo() {
     ? Math.round((present.filter((r) => r.lateMinutes === 0).length / present.length) * 100)
     : 0
 
+  const alerts = [
+    ...lateToday.map((r) => {
+      const worker = workers.find((w) => w.id === r.workerId)
+      return { id: r.id, message: `${worker?.name ?? '?'} llegó ${r.lateMinutes} min tarde (${r.entryTime})`, time: r.entryTime!, type: 'late' as const }
+    }),
+    ...notRegistered.map((w) => ({
+      id: w.id, message: `${w.name} no ha marcado hoy`, time: '—', type: 'absent' as const,
+    })),
+  ]
+
   return (
     <div className="p-6 space-y-6 max-w-[1100px]">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Ahora mismo</h1>
@@ -66,39 +75,14 @@ export function AhoraMismo() {
         </button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-4 gap-3">
-        <StatCard
-          label="Dentro del local"
-          value={`${inside.length} de ${activeWorkers.length}`}
-          icon={Users}
-          iconColor="text-accent"
-        />
-        <StatCard
-          label="Con atraso hoy"
-          value={lateToday.length}
-          icon={Clock}
-          iconColor={lateToday.length > 0 ? 'text-danger' : 'text-text-muted'}
-          valueColor={lateToday.length > 0 ? 'text-danger' : undefined}
-        />
-        <StatCard
-          label="Sin registrar"
-          value={notRegistered.length}
-          icon={XCircle}
-          iconColor={notRegistered.length > 0 ? 'text-warning' : 'text-text-muted'}
-          valueColor={notRegistered.length > 0 ? 'text-warning' : undefined}
-        />
-        <StatCard
-          label="Puntualidad hoy"
-          value={`${punctualPct}%`}
-          icon={CheckCircle2}
-          iconColor={punctualPct >= 80 ? 'text-success' : 'text-warning'}
-          valueColor={punctualPct >= 80 ? 'text-success' : 'text-warning'}
-        />
+        <StatCard label="Dentro del local" value={`${inside.length} de ${activeWorkers.length}`} icon={Users} iconColor="text-accent" />
+        <StatCard label="Con atraso hoy" value={lateToday.length} icon={Clock} iconColor={lateToday.length > 0 ? 'text-danger' : 'text-text-muted'} valueColor={lateToday.length > 0 ? 'text-danger' : undefined} />
+        <StatCard label="Sin registrar" value={notRegistered.length} icon={XCircle} iconColor={notRegistered.length > 0 ? 'text-warning' : 'text-text-muted'} valueColor={notRegistered.length > 0 ? 'text-warning' : undefined} />
+        <StatCard label="Puntualidad hoy" value={`${punctualPct}%`} icon={CheckCircle2} iconColor={punctualPct >= 80 ? 'text-success' : 'text-warning'} valueColor={punctualPct >= 80 ? 'text-success' : 'text-warning'} />
       </div>
 
       <div className="grid grid-cols-[1fr_320px] gap-4">
-        {/* Inside list */}
         <div className="space-y-4">
           <div className="bg-bg-surface border border-border rounded-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
@@ -110,7 +94,7 @@ export function AhoraMismo() {
                 <div className="px-4 py-8 text-center text-sm text-text-muted">Nadie dentro del local</div>
               )}
               {inside.map((record) => {
-                const worker = getWorkerById(record.workerId)
+                const worker = workers.find((w) => w.id === record.workerId)
                 if (!worker) return null
                 return (
                   <div key={record.id} className="px-4 py-3 flex items-center gap-3 hover:bg-bg-hover transition-colors duration-100">
@@ -135,7 +119,6 @@ export function AhoraMismo() {
             </div>
           </div>
 
-          {/* Not registered */}
           <div className="bg-bg-surface border border-border rounded-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <h2 className="text-sm font-semibold text-text-primary">Sin registrar</h2>
@@ -159,14 +142,13 @@ export function AhoraMismo() {
           </div>
         </div>
 
-        {/* Alerts */}
         <div className="bg-bg-surface border border-border rounded-lg overflow-hidden h-fit">
           <div className="px-4 py-3 border-b border-border flex items-center gap-2">
             <AlertTriangle size={13} className="text-warning" />
             <h2 className="text-sm font-semibold text-text-primary">Alertas recientes</h2>
           </div>
           <div className="divide-y divide-border">
-            {RECENT_ALERTS.map((alert) => (
+            {alerts.map((alert) => (
               <div key={alert.id} className="px-4 py-3 hover:bg-bg-hover transition-colors duration-100">
                 <div className="flex items-start gap-2">
                   <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${alert.type === 'absent' ? 'bg-warning' : 'bg-danger'}`} />
@@ -177,7 +159,7 @@ export function AhoraMismo() {
                 </div>
               </div>
             ))}
-            {RECENT_ALERTS.length === 0 && (
+            {alerts.length === 0 && (
               <div className="px-4 py-8 text-center text-sm text-text-muted">Sin alertas</div>
             )}
           </div>
