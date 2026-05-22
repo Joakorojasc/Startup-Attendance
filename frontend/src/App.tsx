@@ -11,7 +11,16 @@ import { Horarios } from '@/pages/Horarios'
 import { Exportar } from '@/pages/Exportar'
 import { Soporte } from '@/pages/Soporte'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 1,
+      retryDelay: 1000,
+    },
+  },
+})
 
 function ProtectedRoutes() {
   const { session, loading, authConfigured } = useAuth()

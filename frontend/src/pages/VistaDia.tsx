@@ -1,3 +1,4 @@
+import { PageLoader } from '@/components/ui/PageLoader'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, AlertTriangle, Clock, Users, UserX, Timer, LogIn, LogOut, Zap, X } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
@@ -149,7 +150,7 @@ export function VistaDia() {
   const simulateDay = useSimulateDay()
 
   if (loadingWorkers || loadingRecords) {
-    return <div className="p-6 text-sm text-text-muted">Cargando...</div>
+    return <PageLoader />
   }
 
   const activeWorkers = workers.filter((w) => w.status === 'active')

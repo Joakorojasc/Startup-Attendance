@@ -1,3 +1,4 @@
+import { PageLoader } from '@/components/ui/PageLoader'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, FileText, Table2, Clock, CheckCircle2, CalendarDays, AlertCircle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -59,7 +60,7 @@ export function ReporteMensual() {
   }))
 
   if (loadingStats || loadingWorkers) {
-    return <div className="p-6 text-sm text-text-muted">Cargando...</div>
+    return <PageLoader />
   }
 
   return (

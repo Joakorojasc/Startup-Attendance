@@ -1,3 +1,4 @@
+import { PageLoader } from '@/components/ui/PageLoader'
 import { useState } from 'react'
 import { Plus, Pencil, Clock, Users } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
@@ -12,7 +13,7 @@ export function Horarios() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   if (loadingSchedules || loadingWorkers) {
-    return <div className="p-6 text-sm text-text-muted">Cargando...</div>
+    return <PageLoader />
   }
 
   const selected = schedules.find((s) => s.id === (selectedId ?? schedules[0]?.id))

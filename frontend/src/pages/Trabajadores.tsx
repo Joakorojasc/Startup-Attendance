@@ -1,3 +1,4 @@
+import { PageLoader } from '@/components/ui/PageLoader'
 import { useState, type ChangeEvent } from 'react'
 import { Search, UserPlus, Pencil, RotateCcw, Fingerprint, FingerprintIcon, X, Wand2, UserMinus } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
@@ -394,7 +395,7 @@ export function Trabajadores() {
   const reactivateWorker = useReactivateWorker()
 
   if (loadingWorkers || loadingSchedules) {
-    return <div className="p-6 text-sm text-text-muted">Cargando...</div>
+    return <PageLoader />
   }
 
   const filtered = workers.filter((w) =>

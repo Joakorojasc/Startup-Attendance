@@ -1,3 +1,4 @@
+import { PageLoader } from '@/components/ui/PageLoader'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UserPlus, Clock, Users, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
@@ -35,7 +36,7 @@ export function AhoraMismo() {
   const { data: records = [], isLoading: loadingRecords } = useAttendanceToday()
 
   if (loadingWorkers || loadingRecords) {
-    return <div className="p-6 text-sm text-text-muted">Cargando...</div>
+    return <PageLoader />
   }
 
   const activeWorkers = workers.filter((w) => w.status === 'active')

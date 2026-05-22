@@ -12,20 +12,20 @@ router = APIRouter(prefix="/attendance", tags=["attendance"], dependencies=[Depe
 
 
 @router.get("/today", response_model=list[AttendanceRecord])
-async def get_today(db: Client = Depends(get_supabase)):
+def get_today(db: Client = Depends(get_supabase)):
     today = date.today().isoformat()
     result = db.table("attendance").select("*").eq("date", today).execute()
     return result.data
 
 
 @router.get("/day/{date_str}", response_model=list[AttendanceRecord])
-async def get_day(date_str: str, db: Client = Depends(get_supabase)):
+def get_day(date_str: str, db: Client = Depends(get_supabase)):
     result = db.table("attendance").select("*").eq("date", date_str).execute()
     return result.data
 
 
 @router.get("/day/{date_str}/stats", response_model=DailyStats)
-async def get_day_stats(date_str: str, db: Client = Depends(get_supabase)):
+def get_day_stats(date_str: str, db: Client = Depends(get_supabase)):
     records = db.table("attendance").select("*").eq("date", date_str).execute().data
     workers = db.table("workers").select("id").eq("status", "active").execute().data
 
@@ -55,7 +55,7 @@ async def get_day_stats(date_str: str, db: Client = Depends(get_supabase)):
 
 
 @router.get("/month/{year}/{month}", response_model=list[MonthlyWorkerStats])
-async def get_month_stats(year: int, month: int, db: Client = Depends(get_supabase)):
+def get_month_stats(year: int, month: int, db: Client = Depends(get_supabase)):
     _, last_day = calendar.monthrange(year, month)
     month_start = f"{year}-{month:02d}-01"
     month_end = f"{year}-{month:02d}-{last_day:02d}"
@@ -98,7 +98,7 @@ async def get_month_stats(year: int, month: int, db: Client = Depends(get_supaba
 
 
 @router.post("/", response_model=AttendanceRecord, status_code=201)
-async def create_record(record: AttendanceRecordCreate, db: Client = Depends(get_supabase)):
+def create_record(record: AttendanceRecordCreate, db: Client = Depends(get_supabase)):
     data = record.model_dump()
     data["date"] = data["date"].isoformat()
     result = db.table("attendance").insert(data).execute()
@@ -106,7 +106,7 @@ async def create_record(record: AttendanceRecordCreate, db: Client = Depends(get
 
 
 @router.patch("/{record_id}", response_model=AttendanceRecord)
-async def update_record(record_id: str, updates: AttendanceRecordUpdate, db: Client = Depends(get_supabase)):
+def update_record(record_id: str, updates: AttendanceRecordUpdate, db: Client = Depends(get_supabase)):
     data = {k: v for k, v in updates.model_dump().items() if v is not None}
     result = db.table("attendance").update(data).eq("id", record_id).execute()
     if not result.data:
@@ -116,7 +116,7 @@ async def update_record(record_id: str, updates: AttendanceRecordUpdate, db: Cli
 
 # Called by ZKTeco integration layer and manual registration
 @router.post("/mark", response_model=AttendanceRecord, status_code=201)
-async def mark_attendance(body: AttendanceMarkRequest, db: Client = Depends(get_supabase)):
+def mark_attendance(body: AttendanceMarkRequest, db: Client = Depends(get_supabase)):
     now = datetime.now()
     target_date = body.date or now.date().isoformat()
     time_str = body.time or now.strftime("%H:%M")
@@ -157,7 +157,7 @@ async def mark_attendance(body: AttendanceMarkRequest, db: Client = Depends(get_
 
 
 @router.post("/simulate-day", status_code=201)
-async def simulate_day(date_str: Optional[str] = None, db: Client = Depends(get_supabase)):
+def simulate_day(date_str: Optional[str] = None, db: Client = Depends(get_supabase)):
     target_date = date_str or date.today().isoformat()
     workers = db.table("workers").select("*, schedules(start_time, end_time)").eq("status", "active").execute().data
     existing_ids = {r["worker_id"] for r in db.table("attendance").select("worker_id").eq("date", target_date).execute().data}
