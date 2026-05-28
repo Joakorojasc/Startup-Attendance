@@ -1,3 +1,13 @@
+export type AppRole = 'owner' | 'admin' | 'viewer'
+
+export interface AppUser {
+  id: string
+  email: string
+  role: AppRole
+  name: string | null
+  createdAt: string
+}
+
 export type WorkerStatus = 'active' | 'inactive'
 export type AttendanceStatus = 'punctual' | 'late' | 'absent' | 'day_off' | 'in_progress'
 export type WorkDay = 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -41,6 +51,7 @@ export interface DailyStats {
 
 export interface MonthlyWorkerStats {
   workerId: string
+  workerName: string
   daysPresent: number
   totalWorkingDays: number
   totalHours: number

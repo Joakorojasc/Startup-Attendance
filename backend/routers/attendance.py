@@ -97,6 +97,19 @@ def get_month_stats(year: int, month: int, db: Client = Depends(get_supabase)):
     return stats
 
 
+@router.get("/range")
+def get_range(
+    date_from: str,
+    date_to: str,
+    worker_id: Optional[str] = None,
+    db: Client = Depends(get_supabase),
+):
+    query = db.table("attendance").select("*").gte("date", date_from).lte("date", date_to)
+    if worker_id:
+        query = query.eq("worker_id", worker_id)
+    return query.order("date").execute().data
+
+
 @router.post("/", response_model=AttendanceRecord, status_code=201)
 def create_record(record: AttendanceRecordCreate, db: Client = Depends(get_supabase)):
     data = record.model_dump()

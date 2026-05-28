@@ -81,6 +81,32 @@ export function useMark() {
   })
 }
 
+export function useCreateSchedule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; startTime: string; endTime: string; workDays: number[] }) =>
+      api.schedules.create(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['schedules'] }),
+  })
+}
+
+export function useUpdateSchedule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; startTime?: string; endTime?: string; workDays?: number[] } }) =>
+      api.schedules.update(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['schedules'] }),
+  })
+}
+
+export function useDeleteSchedule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.schedules.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['schedules'] }),
+  })
+}
+
 export function useSimulateDay() {
   const qc = useQueryClient()
   return useMutation({

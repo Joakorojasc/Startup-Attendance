@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, AUTH_CONFIGURED } from './supabase'
+import type { AppRole } from './types'
 
 interface AuthContextValue {
   session: Session | null
   loading: boolean
   authConfigured: boolean
+  role: AppRole
   login: (email: string, password: string) => Promise<string | null>
   logout: () => Promise<void>
 }
@@ -35,6 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  const role: AppRole = !AUTH_CONFIGURED
+    ? 'owner'
+    : ((session?.user?.user_metadata?.role as AppRole) ?? 'viewer')
+
   async function login(email: string, password: string): Promise<string | null> {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return error ? error.message : null
@@ -45,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading, authConfigured: AUTH_CONFIGURED, login, logout }}>
+    <AuthContext.Provider value={{ session, loading, authConfigured: AUTH_CONFIGURED, role, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

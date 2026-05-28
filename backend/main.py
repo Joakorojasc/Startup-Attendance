@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
-from routers import workers, attendance, schedules, auth
+from routers import workers, attendance, schedules, auth, zk_push, users
 
 app = FastAPI(
     title="AsistenTrack API",
@@ -21,6 +21,8 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(workers.router, prefix="/api/v1")
 app.include_router(attendance.router, prefix="/api/v1")
 app.include_router(schedules.router, prefix="/api/v1")
+app.include_router(zk_push.router)  # /iclock/cdata — ZKBioConnect push protocol
+app.include_router(users.router, prefix="/api/v1")
 
 
 @app.get("/health")

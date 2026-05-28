@@ -10,6 +10,7 @@ import { Trabajadores } from '@/pages/Trabajadores'
 import { Horarios } from '@/pages/Horarios'
 import { Exportar } from '@/pages/Exportar'
 import { Soporte } from '@/pages/Soporte'
+import { Equipo } from '@/pages/Equipo'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,7 +24,7 @@ const queryClient = new QueryClient({
 })
 
 function ProtectedRoutes() {
-  const { session, loading, authConfigured } = useAuth()
+  const { session, loading, authConfigured, role } = useAuth()
 
   if (loading) {
     return (
@@ -41,10 +42,11 @@ function ProtectedRoutes() {
         <Route index element={<AhoraMismo />} />
         <Route path="/dia" element={<VistaDia />} />
         <Route path="/mes" element={<ReporteMensual />} />
-        <Route path="/trabajadores" element={<Trabajadores />} />
-        <Route path="/horarios" element={<Horarios />} />
+        <Route path="/trabajadores" element={role !== 'viewer' ? <Trabajadores /> : <Navigate to="/" replace />} />
+        <Route path="/horarios" element={role !== 'viewer' ? <Horarios /> : <Navigate to="/" replace />} />
         <Route path="/exportar" element={<Exportar />} />
         <Route path="/soporte" element={<Soporte />} />
+        <Route path="/equipo" element={role === 'owner' ? <Equipo /> : <Navigate to="/" replace />} />
       </Route>
     </Routes>
   )
